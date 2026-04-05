@@ -3,19 +3,31 @@
 import { useEffect } from "react"
 import { useReaderSettings } from "@/hooks/useReaderSettings"
 import { useActiveSection } from "@/hooks/useActiveSection"
-import { BookmarkNode, SectionContent } from "@/lib/types"
+import { useSectionLoader, getGroupForId } from "@/hooks/useSectionLoader"
+import { BookmarkNode } from "@/lib/types"
 import Sidebar from "./Sidebar"
 import Toolbar from "./Toolbar"
 
 interface Props {
   bookmarks: BookmarkNode
-  content: Record<string, SectionContent>
   orderedIds: string[]
 }
 
-export default function ReaderShell({ bookmarks, content, orderedIds }: Props) {
+export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   const { settings, updateSetting, hydrated } = useReaderSettings()
   const { activeId, scrollTo } = useActiveSection(orderedIds, hydrated)
+  const { content, loadGroup } = useSectionLoader({})
+
+  // Load the first group on mount
+  useEffect(() => {
+    if (!hydrated) return
+    const targetId = settings.lastSectionId || orderedIds[0]
+    if (targetId) {
+      const group = getGroupForId(targetId)
+      if (group) loadGroup(group)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated])
 
   // Sync lastSectionId to localStorage when the viewport-tracked section changes.
   // This lives here (not in useActiveSection) because persistence is a ReaderShell concern.
@@ -25,8 +37,28 @@ export default function ReaderShell({ bookmarks, content, orderedIds }: Props) {
     }
   }, [activeId, updateSetting])
 
+  // Load adjacent groups as user scrolls near boundaries
+  useEffect(() => {
+    if (!activeId) return
+    const idx = orderedIds.indexOf(activeId)
+    if (idx === -1) return
+
+    // Look ahead 5 sections
+    for (let i = idx; i < Math.min(idx + 5, orderedIds.length); i++) {
+      const group = getGroupForId(orderedIds[i])
+      if (group) loadGroup(group)
+    }
+  }, [activeId, orderedIds, loadGroup])
+
   const handleNavigate = (id: string) => {
-    scrollTo(id)
+    const group = getGroupForId(id)
+    if (group) {
+      loadGroup(group).then(() => {
+        requestAnimationFrame(() => scrollTo(id))
+      })
+    } else {
+      scrollTo(id)
+    }
     if (window.innerWidth < 768) {
       updateSetting("sidebarOpen", false)
     }

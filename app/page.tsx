@@ -1,15 +1,12 @@
 import fs from "fs"
 import path from "path"
-import { BookmarkNode, SectionContent } from "@/lib/types"
+import { BookmarkNode } from "@/lib/types"
 import ReaderShell from "@/components/ReaderShell"
 
 export default function HomePage() {
   const dataDir = path.join(process.cwd(), "public", "data")
   const bookmarks: BookmarkNode = JSON.parse(
     fs.readFileSync(path.join(dataDir, "bookmarks.json"), "utf-8")
-  )
-  const content: Record<string, SectionContent> = JSON.parse(
-    fs.readFileSync(path.join(dataDir, "content.json"), "utf-8")
   )
 
   // Build ordered list of leaf section IDs for rendering
@@ -25,5 +22,5 @@ export default function HomePage() {
   }
   collectLeaves(bookmarks)
 
-  return <ReaderShell bookmarks={bookmarks} content={content} orderedIds={orderedIds} />
+  return <ReaderShell bookmarks={bookmarks} orderedIds={orderedIds} />
 }
