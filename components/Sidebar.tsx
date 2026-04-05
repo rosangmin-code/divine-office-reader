@@ -11,6 +11,12 @@ interface Props {
   onClose: () => void
 }
 
+/** Find the first leaf descendant of a node */
+function getFirstLeaf(node: BookmarkNode): string {
+  if (node.children.length === 0) return node.id
+  return getFirstLeaf(node.children[0])
+}
+
 function TreeNode({
   node,
   activeId,
@@ -75,7 +81,11 @@ function TreeNode({
           if (isLeaf) {
             onNavigate(node.id)
           } else {
+            const wasExpanded = expanded
             setExpanded(!expanded)
+            if (!wasExpanded) {
+              onNavigate(getFirstLeaf(node))
+            }
           }
         }}
         onKeyDown={handleKeyDown}
