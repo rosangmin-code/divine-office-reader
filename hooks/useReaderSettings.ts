@@ -29,12 +29,10 @@ export function useReaderSettings() {
   // Restore scroll position once on mount
   useEffect(() => {
     if (!hydrated) return
-    const id = settings.lastSectionId
-    if (id) {
-      document.getElementById(id)?.scrollIntoView({ behavior: "instant" })
+    const { lastSectionId } = loadSettings()
+    if (lastSectionId) {
+      document.getElementById(lastSectionId)?.scrollIntoView({ behavior: "instant" })
     }
-    // Only run once after hydration
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated])
 
   const updateSetting = useCallback(

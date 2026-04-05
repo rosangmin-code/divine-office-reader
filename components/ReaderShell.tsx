@@ -17,7 +17,8 @@ export default function ReaderShell({ bookmarks, content, orderedIds }: Props) {
   const { settings, updateSetting, hydrated } = useReaderSettings()
   const { activeId, scrollTo } = useActiveSection(orderedIds, hydrated)
 
-  // Sync lastSectionId when active section changes
+  // Sync lastSectionId to localStorage when the viewport-tracked section changes.
+  // This lives here (not in useActiveSection) because persistence is a ReaderShell concern.
   useEffect(() => {
     if (activeId) {
       updateSetting("lastSectionId", activeId)
