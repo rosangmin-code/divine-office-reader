@@ -113,7 +113,7 @@ function TreeNode({
   )
 }
 
-export default function Sidebar({ bookmarks, activeId, onNavigate, open, onClose }: Props) {
+function SidebarContent({ bookmarks, activeId, onNavigate }: { bookmarks: BookmarkNode; activeId: string | null; onNavigate: (id: string) => void }) {
   const [search, setSearch] = useState("")
 
   const searchResults: BookmarkNode[] = []
@@ -129,17 +129,8 @@ export default function Sidebar({ bookmarks, activeId, onNavigate, open, onClose
     collectMatches(bookmarks)
   }
 
-  const sidebarContent = (
-    <aside
-      className={`
-        flex flex-col bg-white dark:bg-stone-900 overflow-hidden
-        fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw]
-        md:relative md:z-auto md:w-80
-        border-r border-stone-200 dark:border-stone-800
-        transform transition-transform duration-200 ease-out
-        ${open ? "translate-x-0" : "-translate-x-full md:hidden"}
-      `}
-    >
+  return (
+    <>
       <div className="p-3 border-b border-stone-200 dark:border-stone-800">
         <label htmlFor="sidebar-search" className="sr-only">검색</label>
         <input
@@ -185,20 +176,37 @@ export default function Sidebar({ bookmarks, activeId, onNavigate, open, onClose
           ))
         )}
       </nav>
-    </aside>
+    </>
   )
+}
 
+export default function Sidebar({ bookmarks, activeId, onNavigate, open, onClose }: Props) {
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Desktop sidebar: simple static positioning in flex layout */}
       {open && (
+        <aside className="hidden md:flex w-80 border-r border-stone-200 dark:border-stone-800 flex-col bg-white dark:bg-stone-900 overflow-hidden flex-shrink-0">
+          <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
+        </aside>
+      )}
+
+      {/* Mobile sidebar: fixed overlay with slide animation */}
+      <div
+        className={`md:hidden fixed inset-0 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      >
+        {/* Backdrop */}
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden transition-opacity"
+          className="absolute inset-0 bg-black/40"
           onClick={onClose}
           aria-hidden="true"
         />
-      )}
-      {sidebarContent}
+        {/* Drawer */}
+        <aside
+          className={`absolute inset-y-0 left-0 w-80 max-w-[85vw] flex flex-col bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 overflow-hidden shadow-xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
+        >
+          <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
+        </aside>
+      </div>
     </>
   )
 }
