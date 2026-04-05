@@ -1,4 +1,4 @@
-import fs from "fs"
+import fs from "fs/promises"
 import path from "path"
 import { NextResponse } from "next/server"
 import { ALL_CONTENT_GROUPS, ContentGroup } from "@/lib/types"
@@ -14,7 +14,7 @@ export async function GET(
 
   const filePath = path.join(process.cwd(), "public", "data", "content", `${group}.json`)
   try {
-    const data = fs.readFileSync(filePath, "utf-8")
+    const data = await fs.readFile(filePath, "utf-8")
     return new NextResponse(data, {
       headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=31536000, immutable" },
     })

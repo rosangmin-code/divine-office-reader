@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef, useCallback } from "react"
 import { useReaderSettings } from "@/hooks/useReaderSettings"
 import { useActiveSection } from "@/hooks/useActiveSection"
 import { useSectionLoader, getGroupForId } from "@/hooks/useSectionLoader"
 import { BookmarkNode } from "@/lib/types"
+import { loadSettings } from "@/lib/reader-store"
 import Sidebar from "./Sidebar"
 import Toolbar from "./Toolbar"
 
@@ -17,17 +18,19 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   const { settings, updateSetting, hydrated } = useReaderSettings()
   const { activeId, scrollTo } = useActiveSection(orderedIds, hydrated)
   const { content, loadGroup } = useSectionLoader({})
+  const pendingScrollId = useRef<string | null>(null)
 
-  // Load the first group on mount
+  // Load the first group on mount — reads lastSectionId directly from storage
+  // to avoid depending on settings state (which would re-trigger on every change)
   useEffect(() => {
     if (!hydrated) return
-    const targetId = settings.lastSectionId || orderedIds[0]
+    const { lastSectionId } = loadSettings()
+    const targetId = lastSectionId || orderedIds[0]
     if (targetId) {
       const group = getGroupForId(targetId)
       if (group) loadGroup(group)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated])
+  }, [hydrated, orderedIds, loadGroup])
 
   // Sync lastSectionId to localStorage when the viewport-tracked section changes.
   // This lives here (not in useActiveSection) because persistence is a ReaderShell concern.
@@ -43,26 +46,33 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
     const idx = orderedIds.indexOf(activeId)
     if (idx === -1) return
 
-    // Look ahead 5 sections
     for (let i = idx; i < Math.min(idx + 5, orderedIds.length); i++) {
       const group = getGroupForId(orderedIds[i])
       if (group) loadGroup(group)
     }
   }, [activeId, orderedIds, loadGroup])
 
-  const handleNavigate = (id: string) => {
+  // Scroll to pending target after content renders
+  useEffect(() => {
+    if (pendingScrollId.current && content[pendingScrollId.current]) {
+      const id = pendingScrollId.current
+      pendingScrollId.current = null
+      requestAnimationFrame(() => scrollTo(id))
+    }
+  }, [content, scrollTo])
+
+  const handleNavigate = useCallback((id: string) => {
     const group = getGroupForId(id)
     if (group) {
-      loadGroup(group).then(() => {
-        requestAnimationFrame(() => scrollTo(id))
-      })
+      pendingScrollId.current = id
+      loadGroup(group)
     } else {
       scrollTo(id)
     }
     if (window.innerWidth < 768) {
       updateSetting("sidebarOpen", false)
     }
-  }
+  }, [loadGroup, scrollTo, updateSetting])
 
   return (
     <div className="h-full flex flex-col">

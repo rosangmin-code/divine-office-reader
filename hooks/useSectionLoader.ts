@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { SectionContent, ContentGroup, ALL_CONTENT_GROUPS } from "@/lib/types"
 
 type ContentMap = Record<string, SectionContent>
 
-/** orderedIds에서 필요한 group을 추론 */
+/** id의 prefix로 소속 group을 추론 */
 export function getGroupForId(id: string): ContentGroup | null {
   for (const g of ALL_CONTENT_GROUPS) {
-    if (id.startsWith(g)) return g
+    if (id.startsWith(g + "-") || id === g) return g
   }
   return null
 }
@@ -26,22 +26,30 @@ export function useSectionLoader(
     return groups
   })
 
+  // Synchronous in-flight tracking to prevent duplicate fetches within the same render cycle
+  const inFlight = useRef<Set<ContentGroup>>(new Set())
+
   const loadGroup = useCallback(async (group: ContentGroup) => {
-    if (loadedGroups.has(group)) return
-    setLoadedGroups((prev) => new Set(prev).add(group))
+    if (inFlight.current.has(group)) return
+    inFlight.current.add(group)
+    setLoadedGroups((prev) => {
+      if (prev.has(group)) return prev
+      return new Set(prev).add(group)
+    })
     try {
       const res = await fetch(`/api/content/${group}`)
-      if (!res.ok) return
+      if (!res.ok) throw new Error(res.statusText)
       const data: ContentMap = await res.json()
       setContent((prev) => ({ ...prev, ...data }))
     } catch {
+      inFlight.current.delete(group)
       setLoadedGroups((prev) => {
         const next = new Set(prev)
         next.delete(group)
         return next
       })
     }
-  }, [loadedGroups])
+  }, [])
 
   return { content, loadGroup, loadedGroups }
 }
