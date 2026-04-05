@@ -62,12 +62,17 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
 
   const handleNavigate = useCallback((id: string) => {
     const group = getGroupForId(id)
-    if (group) {
-      pendingScrollId.current = id
-      loadGroup(group)
-    } else {
+    if (group) loadGroup(group)
+
+    // If element already exists in DOM, scroll immediately.
+    // Otherwise queue scroll for after content loads.
+    const el = document.getElementById(id)
+    if (el) {
       scrollTo(id)
+    } else {
+      pendingScrollId.current = id
     }
+
     if (window.innerWidth < 768) {
       updateSetting("sidebarOpen", false)
     }
