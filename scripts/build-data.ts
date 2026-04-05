@@ -149,20 +149,24 @@ function parseWeekFile(filePath: string): RawSection[] {
 }
 
 function cleanContent(lines: string[]): string {
-  // Remove standalone page numbers and repeated week header lines
-  const weekHeaderRe = /^\d\s*д[үу]г[аэ]+р\s+долоо\s+хоног$/
-  const pageNumRe = /^\d{2,3}$/
+  // P0-1: Enhanced content normalization
+  const weekHeaderRe = /^\d\s*д[үуУ]г[аэАЭ]+р\s+долоо\s+хоног$/i
+  const pageNumRe = /^\d{1,4}$/
+  // Pattern: \f + page number + tabs + week header (embedded page breaks)
+  const embeddedPageBreakRe = /^\f?\d{1,4}\s*\t/
 
   return lines
+    .map(line => line.replace(/\f/g, '').replace(/\t+/g, ' '))  // strip \f and \t
     .filter(line => {
       const s = line.trim()
-      if (!s) return true // keep blank lines
-      if (pageNumRe.test(s) && parseInt(s) >= 49 && parseInt(s) <= 900) return false
+      if (!s) return true
+      if (pageNumRe.test(s) && parseInt(s) >= 49) return false
       if (weekHeaderRe.test(s)) return false
+      if (embeddedPageBreakRe.test(line.trim())) return false
       return true
     })
     .join('\n')
-    .replace(/\n{3,}/g, '\n\n') // collapse multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
@@ -265,97 +269,215 @@ function buildPropersSections(): { sections: Map<string, Section>, rootChildren:
   const sections = new Map<string, Section>()
   const rootChildren: string[] = []
 
-  // Split propers by season headers
-  const seasonPatterns: { pattern: RegExp, id: string, title: string, titleMn: string }[] = [
-    { pattern: /ИРЭЛТИЙН ЦАГ УЛИРАЛ/, id: 'propers-advent', title: '대림', titleMn: 'Ирэлтийн цаг улирал' },
-    { pattern: /ЭЗЭНИЙ МЭНДЭЛСНИЙ.*ЦАГ УЛИРАЛ|ЭЗЭНИЙ МЭНДЛЭЛТИЙН/, id: 'propers-christmas', title: '성탄', titleMn: 'Эзэний мэндлэлтийн цаг улирал' },
-    { pattern: /ДӨЧИН ХОНОГИЙН ЦАГ УЛИРАЛ/, id: 'propers-lent', title: '사순', titleMn: 'Дөчин хоногийн цаг улирал' },
-    { pattern: /АМИЛАЛТЫН ЦАГ УЛИРАЛ/, id: 'propers-easter', title: '부활', titleMn: 'Амилалтын цаг улирал' },
-    { pattern: /ЖИРИЙН ЦАГ УЛИРАЛ|ЖИРИЙН ЦАГ/, id: 'propers-ordinary', title: '연중', titleMn: 'Жирийн цаг улирал' },
-    { pattern: /ГЭГЭЭНТНҮҮДИЙН|ОНЦЛОГ ШИНЖ/, id: 'propers-saints', title: '성인축일', titleMn: 'Гэгээнтнүүдийн онцлог шинж' },
+  // P0-2 + P1-1: Precise season headers (first occurrence only per season)
+  const seasonDefs: { pattern: RegExp, id: string, title: string, titleMn: string }[] = [
+    { pattern: /^ИРЭЛТИЙН ЦАГ УЛИРАЛ$/, id: 'propers-advent', title: '대림', titleMn: 'Ирэлтийн цаг улирал' },
+    { pattern: /^ЭЗЭНИЙ МЭНДЛЭЛТИЙН ЦАГ УЛИРАЛ$/, id: 'propers-christmas', title: '성탄', titleMn: 'Эзэний мэндлэлтийн цаг улирал' },
+    { pattern: /^ДӨЧИН ХОНОГИЙН ЦАГ УЛИРАЛ$/, id: 'propers-lent', title: '사순', titleMn: 'Дөчин хоногийн цаг улирал' },
+    { pattern: /^(ДЭЭГҮҮР ӨНГӨРӨХ ЦАГ УЛИРАЛ|АМИЛАЛТЫН ЦАГ УЛИРАЛ)$/, id: 'propers-easter', title: '부활', titleMn: 'Амилалтын цаг улирал' },
+    { pattern: /^ЖИРИЙН ЦАГ УЛИРАЛ ДАХЬ$/, id: 'propers-ordinary', title: '연중', titleMn: 'Жирийн цаг улирал' },
+    { pattern: /^ГЭГЭЭНТНҮҮДИЙН$/, id: 'propers-saints', title: '성인축일', titleMn: 'Гэгээнтнүүдийн' },
   ]
 
-  // Find season boundaries
-  const boundaries: { idx: number, id: string, title: string, titleMn: string }[] = []
+  // Sunday/feast header pattern within seasons
+  const sundayRe = /^(.*ДАХЬ НЯМ ГАРАГ|ЭЗЭНИЙ БАЯР|.*ГЭГЭЭНТНИЙ|.*ГЭГЭЭНТНҮҮД|ХАМАГ ГЭГЭЭНТНҮҮД|.*БАПТИСТ.*)$/
+
+  // Step 1: Find season boundaries
+  const seasonBounds: { idx: number, id: string, title: string, titleMn: string }[] = []
+  const foundSeasons = new Set<string>()
 
   for (let i = 0; i < allLines.length; i++) {
-    const line = allLines[i].trim().toUpperCase()
-    for (const sp of seasonPatterns) {
-      if (sp.pattern.test(line) && !boundaries.find(b => b.id === sp.id)) {
-        boundaries.push({ idx: i, ...sp })
+    const line = allLines[i].trim()
+    for (const sd of seasonDefs) {
+      if (!foundSeasons.has(sd.id) && sd.pattern.test(line)) {
+        seasonBounds.push({ idx: i, ...sd })
+        foundSeasons.add(sd.id)
         break
       }
     }
   }
+  seasonBounds.sort((a, b) => a.idx - b.idx)
 
-  // Sort by line index
-  boundaries.sort((a, b) => a.idx - b.idx)
+  // Step 2: For each season, find Sunday/feast sub-boundaries
+  for (let si = 0; si < seasonBounds.length; si++) {
+    const season = seasonBounds[si]
+    const seasonEnd = si + 1 < seasonBounds.length ? seasonBounds[si + 1].idx : allLines.length
+    const seasonLines = allLines.slice(season.idx, seasonEnd)
 
-  // If no boundaries found, treat entire file as one section
-  if (boundaries.length === 0) {
-    const id = 'propers-all'
-    sections.set(id, {
-      id,
-      title: '시기별 고유문',
-      titleMn: 'Цаг улирлын онцлог шинж',
-      level: 3,
-      content: cleanContent(allLines),
-      children: [],
-    })
-    rootChildren.push(id)
-  } else {
-    // Add intro section if content before first boundary
-    if (boundaries[0].idx > 5) {
-      const introId = 'propers-intro'
-      sections.set(introId, {
-        id: introId,
-        title: '안내',
-        titleMn: 'Танилцуулга',
-        level: 4,
-        content: cleanContent(allLines.slice(0, boundaries[0].idx)),
-        children: [],
-      })
-      rootChildren.push(introId)
+    // Find sub-section headers within this season
+    const subBounds: { offset: number, titleMn: string }[] = []
+    for (let j = 1; j < seasonLines.length; j++) {
+      const line = seasonLines[j].trim()
+      if (sundayRe.test(line) && line.length > 3 && line.length < 80) {
+        subBounds.push({ offset: j, titleMn: line })
+      }
     }
 
-    for (let i = 0; i < boundaries.length; i++) {
-      const b = boundaries[i]
-      const endIdx = i + 1 < boundaries.length ? boundaries[i + 1].idx : allLines.length
-      const content = cleanContent(allLines.slice(b.idx, endIdx))
-
-      sections.set(b.id, {
-        id: b.id,
-        title: b.title,
-        titleMn: b.titleMn,
+    if (subBounds.length === 0) {
+      // No sub-divisions: keep as single leaf
+      const content = cleanContent(seasonLines)
+      sections.set(season.id, {
+        id: season.id,
+        title: season.title,
+        titleMn: season.titleMn,
         level: 4,
         content,
         children: [],
       })
-      rootChildren.push(b.id)
+      rootChildren.push(season.id)
+    } else {
+      // Create season container + sub-leaves
+      const subIds: string[] = []
+
+      // Intro content before first sub-boundary
+      if (subBounds[0].offset > 3) {
+        const introId = `${season.id}-intro`
+        sections.set(introId, {
+          id: introId,
+          title: `${season.title} 안내`,
+          titleMn: `${season.titleMn} — танилцуулга`,
+          level: 5,
+          content: cleanContent(seasonLines.slice(0, subBounds[0].offset)),
+          children: [],
+        })
+        subIds.push(introId)
+      }
+
+      for (let k = 0; k < subBounds.length; k++) {
+        const sub = subBounds[k]
+        const subEnd = k + 1 < subBounds.length ? subBounds[k + 1].offset : seasonLines.length
+        const subContent = cleanContent(seasonLines.slice(sub.offset, subEnd))
+        const subSlug = slugify(sub.titleMn).substring(0, 40)
+        const subId = `${season.id}-${subSlug}`
+
+        // Korean title mapping for common patterns
+        let koTitle = sub.titleMn
+        const sundayMatch = sub.titleMn.match(/(.+)\s+ДАХЬ НЯМ ГАРАГ/)
+        if (sundayMatch) koTitle = `${sundayMatch[1]} 주일`
+
+        sections.set(subId, {
+          id: subId,
+          title: koTitle,
+          titleMn: sub.titleMn,
+          level: 5,
+          content: subContent,
+          children: [],
+        })
+        subIds.push(subId)
+      }
+
+      // Season container
+      sections.set(season.id, {
+        id: season.id,
+        title: season.title,
+        titleMn: season.titleMn,
+        level: 4,
+        content: '',
+        children: subIds,
+      })
+      rootChildren.push(season.id)
     }
+  }
+
+  // Add intro if content before first season
+  if (seasonBounds.length > 0 && seasonBounds[0].idx > 5) {
+    const introId = 'propers-intro'
+    sections.set(introId, {
+      id: introId,
+      title: '안내',
+      titleMn: 'Танилцуулга',
+      level: 4,
+      content: cleanContent(allLines.slice(0, seasonBounds[0].idx)),
+      children: [],
+    })
+    rootChildren.unshift(introId)
   }
 
   return { sections, rootChildren }
 }
 
 function buildHymnsSections(): { sections: Map<string, Section>, rootChildren: string[] } {
-  const filePath = path.join(SOURCE, 'hymns', 'hymns_full.txt')
+  // P0-3: Use hymns_final.txt instead of hymns_full.txt
+  const filePath = path.join(SOURCE, 'hymns', 'hymns_final.txt')
   const text = readFile(filePath)
-  const content = cleanContent(text.split('\n'))
+  const allLines = text.split('\n')
 
   const sections = new Map<string, Section>()
-  const id = 'hymns-all'
+  const rootChildren: string[] = []
 
-  sections.set(id, {
-    id,
-    title: '찬미가',
-    titleMn: 'Магтуу',
-    level: 3,
-    content,
-    children: [],
-  })
+  // P1-2: Split hymns into individual entries
+  // Structure: TOC (numbered lines like "1.", "2.") + blank + title lines + blank + next TOC block
+  // After all TOCs, actual hymn lyrics appear
+  // Strategy: find Mongolian title lines (non-blank, non-number, non-МАГТУУ) and treat each as a hymn
 
-  return { sections, rootChildren: [id] }
+  // Skip TOC sections (lines that are just numbers like "1.", "2." or "МАГТУУ")
+  const tocRe = /^\d+\.?$/
+  const headerRe = /^МАГТУУ$/i
+
+  // Collect hymn boundaries: a hymn starts with a title line that isn't a TOC number
+  // and ends when the next title appears (separated by patterns)
+  const hymnStarts: { idx: number, title: string }[] = []
+  let inToc = true
+
+  for (let i = 0; i < allLines.length; i++) {
+    const line = allLines[i].trim()
+    if (!line || tocRe.test(line) || headerRe.test(line)) {
+      continue
+    }
+
+    // Check if this is a title line: non-empty, after blank or TOC block
+    // Titles are typically short uppercase or capitalized Mongolian lines
+    if (inToc) {
+      // First non-TOC content line marks the actual hymn content area
+      inToc = false
+    }
+
+    // Detect hymn title: preceded by blank line or start, and is relatively short
+    const prevLine = i > 0 ? allLines[i - 1].trim() : ''
+    const isPrevBlank = !prevLine || tocRe.test(prevLine) || headerRe.test(prevLine)
+    const isShortLine = line.length < 60
+
+    if (isPrevBlank && isShortLine && !tocRe.test(line)) {
+      // Check if next line is also non-blank (title might be multi-line) or is the start of lyrics
+      hymnStarts.push({ idx: i, title: line })
+    }
+  }
+
+  // Build hymn sections
+  if (hymnStarts.length === 0) {
+    // Fallback: single blob
+    const id = 'hymns-all'
+    sections.set(id, {
+      id, title: '찬미가', titleMn: 'Магтуу',
+      level: 3, content: cleanContent(allLines), children: [],
+    })
+    rootChildren.push(id)
+  } else {
+    let counter = 0
+    for (let h = 0; h < hymnStarts.length; h++) {
+      counter++
+      const start = hymnStarts[h]
+      const endIdx = h + 1 < hymnStarts.length ? hymnStarts[h + 1].idx : allLines.length
+      const hymnLines = allLines.slice(start.idx, endIdx)
+      const content = cleanContent(hymnLines)
+
+      // Skip very short entries (likely TOC artifacts)
+      if (content.length < 10) continue
+
+      const id = `hymns-${counter}`
+      sections.set(id, {
+        id,
+        title: `${counter}. ${start.title}`,
+        titleMn: start.title,
+        level: 4,
+        content,
+        children: [],
+      })
+      rootChildren.push(id)
+    }
+  }
+
+  return { sections, rootChildren }
 }
 
 function buildAll() {
@@ -497,6 +619,38 @@ function buildAll() {
   console.log(`  Total text characters: ${totalChars.toLocaleString()}`)
   console.log(`  Output: ${OUT}/content.json (${(fs.statSync(path.join(OUT, 'content.json')).size / 1024).toFixed(0)} KB)`)
   console.log(`  Output: ${OUT}/bookmarks.json`)
+
+  // P2-1: Build QA
+  validateOutput(contentObj)
+}
+
+// P2-1: Build-time QA validation
+function validateOutput(contentObj: Record<string, { content: string; titleMn: string }>) {
+  const errors: string[] = []
+  let formFeedCount = 0
+  let tabCount = 0
+
+  for (const [id, section] of Object.entries(contentObj)) {
+    if (section.content.includes('\f')) {
+      formFeedCount++
+      if (formFeedCount <= 3) errors.push(`  T-CLEAN-01: \\f in ${id}`)
+    }
+    if (section.content.includes('\t')) {
+      tabCount++
+      if (tabCount <= 3) errors.push(`  T-CLEAN-02: \\t in ${id}`)
+    }
+    if (!section.titleMn) errors.push(`  T-STRUCT-07: empty titleMn in ${id}`)
+  }
+
+  if (formFeedCount > 0) errors.unshift(`  T-CLEAN-01 TOTAL: ${formFeedCount} sections contain \\f`)
+  if (tabCount > 0) errors.unshift(`  T-CLEAN-02 TOTAL: ${tabCount} sections contain \\t`)
+
+  if (errors.length > 0) {
+    console.warn('\n⚠️  Build QA warnings:')
+    errors.forEach(e => console.warn(e))
+  } else {
+    console.log('✅ Build QA: all checks passed')
+  }
 }
 
 buildAll()
