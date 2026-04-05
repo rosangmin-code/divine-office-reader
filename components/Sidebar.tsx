@@ -180,33 +180,42 @@ function SidebarContent({ bookmarks, activeId, onNavigate }: { bookmarks: Bookma
   )
 }
 
-export default function Sidebar({ bookmarks, activeId, onNavigate, open, onClose }: Props) {
+/** Desktop sidebar: static in flex layout, rendered inside the flex container */
+export function DesktopSidebar({ bookmarks, activeId, onNavigate, open }: Omit<Props, "onClose">) {
+  if (!open) return null
+  return (
+    <aside className="hidden md:flex w-80 border-r border-stone-200 dark:border-stone-800 flex-col bg-white dark:bg-stone-900 overflow-hidden flex-shrink-0">
+      <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
+    </aside>
+  )
+}
+
+/** Mobile sidebar: fixed overlay, rendered outside flex to avoid covering toolbar */
+export function MobileSidebar({ bookmarks, activeId, onNavigate, open, onClose }: Props) {
+  return (
+    <div
+      className={`md:hidden fixed inset-x-0 bottom-0 top-12 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+    >
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside
+        className={`absolute inset-y-0 left-0 w-80 max-w-[85vw] flex flex-col bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 overflow-hidden shadow-xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
+      </aside>
+    </div>
+  )
+}
+
+// Default export for backward compat
+export default function Sidebar(props: Props) {
   return (
     <>
-      {/* Desktop sidebar: simple static positioning in flex layout */}
-      {open && (
-        <aside className="hidden md:flex w-80 border-r border-stone-200 dark:border-stone-800 flex-col bg-white dark:bg-stone-900 overflow-hidden flex-shrink-0">
-          <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
-        </aside>
-      )}
-
-      {/* Mobile sidebar: fixed overlay with slide animation */}
-      <div
-        className={`md:hidden fixed inset-0 z-40 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/40"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-        {/* Drawer */}
-        <aside
-          className={`absolute inset-y-0 left-0 w-80 max-w-[85vw] flex flex-col bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 overflow-hidden shadow-xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
-        >
-          <SidebarContent bookmarks={bookmarks} activeId={activeId} onNavigate={onNavigate} />
-        </aside>
-      </div>
+      <DesktopSidebar {...props} />
+      <MobileSidebar {...props} />
     </>
   )
 }

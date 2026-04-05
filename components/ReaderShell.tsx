@@ -6,7 +6,7 @@ import { useActiveSection } from "@/hooks/useActiveSection"
 import { useSectionLoader, getGroupForId } from "@/hooks/useSectionLoader"
 import { BookmarkNode } from "@/lib/types"
 import { loadSettings } from "@/lib/reader-store"
-import Sidebar from "./Sidebar"
+import { DesktopSidebar, MobileSidebar } from "./Sidebar"
 import Toolbar from "./Toolbar"
 import Breadcrumb from "./Breadcrumb"
 
@@ -84,13 +84,21 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
         onToggleDark={() => updateSetting("darkMode", !settings.darkMode)}
       />
       <Breadcrumb bookmarks={bookmarks} activeId={activeId} />
+      {/* Mobile sidebar: fixed overlay outside flex to avoid covering toolbar */}
+      <MobileSidebar
+        bookmarks={bookmarks}
+        activeId={activeId}
+        onNavigate={handleNavigate}
+        open={settings.sidebarOpen}
+        onClose={() => updateSetting("sidebarOpen", false)}
+      />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar
+        {/* Desktop sidebar: inside flex for proper layout */}
+        <DesktopSidebar
           bookmarks={bookmarks}
           activeId={activeId}
           onNavigate={handleNavigate}
           open={settings.sidebarOpen}
-          onClose={() => updateSetting("sidebarOpen", false)}
         />
         <main
           className="flex-1 overflow-y-auto px-4 py-8 md:px-12 lg:px-20"

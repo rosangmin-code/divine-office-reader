@@ -11,7 +11,7 @@ interface Props {
 
 export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggleDark }: Props) {
   return (
-    <header className="h-12 flex items-center justify-between px-3 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex-shrink-0">
+    <header className="h-12 flex items-center justify-between px-3 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex-shrink-0 relative z-50">
       <div className="flex items-center gap-2">
         <button
           onClick={onToggleSidebar}
