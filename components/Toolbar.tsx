@@ -11,11 +11,11 @@ interface Props {
 
 export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggleDark }: Props) {
   return (
-    <header className="h-12 flex items-center justify-between px-4 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex-shrink-0">
-      <div className="flex items-center gap-3">
+    <header className="h-12 flex items-center justify-between px-3 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex-shrink-0">
+      <div className="flex items-center gap-2">
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400"
+          className="p-2.5 -m-1 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
           aria-label={settings.sidebarOpen ? "사이드바 닫기" : "사이드바 열기"}
           aria-expanded={settings.sidebarOpen}
         >
@@ -27,10 +27,10 @@ export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggl
           Залбиралт цагийн ёслол
         </h1>
       </div>
-      <div className="flex items-center gap-2" role="group" aria-label="읽기 설정">
+      <div className="flex items-center gap-1" role="group" aria-label="읽기 설정">
         <button
           onClick={() => onFontSize(-2)}
-          className="px-2 py-1 rounded text-sm hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400"
+          className="px-2.5 py-1.5 rounded-lg text-sm hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
           aria-label="폰트 축소"
         >
           A-
@@ -40,15 +40,15 @@ export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggl
         </span>
         <button
           onClick={() => onFontSize(2)}
-          className="px-2 py-1 rounded text-sm hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400"
+          className="px-2.5 py-1.5 rounded-lg text-sm hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
           aria-label="폰트 확대"
         >
           A+
         </button>
-        <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-1" role="separator" />
+        <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" role="separator" />
         <button
           onClick={onToggleDark}
-          className="p-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400"
+          className="p-2.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
           aria-label={settings.darkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
         >
           {settings.darkMode ? (
