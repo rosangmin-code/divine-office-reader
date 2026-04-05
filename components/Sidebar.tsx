@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { BookmarkNode } from "@/lib/types"
 
 interface Props {
@@ -25,7 +25,6 @@ function TreeNode({
   const isActive = node.id === activeId
   const isLeaf = !hasChildren
 
-  // Check if any descendant is active
   const hasActiveDescendant = useCallback(
     function check(n: BookmarkNode): boolean {
       if (n.id === activeId) return true
@@ -35,13 +34,32 @@ function TreeNode({
   )
   const containsActive = hasActiveDescendant(node)
 
-  // Auto-expand if descendant is active
-  if (containsActive && !expanded && hasChildren) {
-    setExpanded(true)
+  // Auto-expand if descendant is active (via effect, not render phase)
+  useEffect(() => {
+    if (containsActive && hasChildren) {
+      setExpanded(true)
+    }
+  }, [containsActive, hasChildren])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      if (isLeaf) {
+        onNavigate(node.id)
+      } else {
+        setExpanded(!expanded)
+      }
+    } else if (e.key === "ArrowRight" && hasChildren && !expanded) {
+      e.preventDefault()
+      setExpanded(true)
+    } else if (e.key === "ArrowLeft" && hasChildren && expanded) {
+      e.preventDefault()
+      setExpanded(false)
+    }
   }
 
   return (
-    <div>
+    <div role="treeitem" aria-expanded={hasChildren ? expanded : undefined}>
       <button
         onClick={() => {
           if (isLeaf) {
@@ -50,6 +68,8 @@ function TreeNode({
             setExpanded(!expanded)
           }
         }}
+        onKeyDown={handleKeyDown}
+        aria-current={isActive ? "location" : undefined}
         className={`
           w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-1.5 transition-colors
           ${isActive ? "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-medium" : ""}
@@ -59,15 +79,15 @@ function TreeNode({
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {hasChildren && (
-          <span className="text-[10px] text-stone-400 w-3 flex-shrink-0">
-            {expanded ? "▼" : "▶"}
+          <span className="text-[10px] text-stone-400 w-3 flex-shrink-0" aria-hidden="true">
+            {expanded ? "\u25BC" : "\u25B6"}
           </span>
         )}
         {isLeaf && <span className="w-3 flex-shrink-0" />}
         <span className="truncate">{node.titleMn || node.title}</span>
       </button>
       {hasChildren && expanded && (
-        <div>
+        <div role="group">
           {node.children.map((child) => (
             <TreeNode
               key={child.id}
@@ -86,7 +106,6 @@ function TreeNode({
 export default function Sidebar({ bookmarks, activeId, onNavigate }: Props) {
   const [search, setSearch] = useState("")
 
-  // Collect all leaf nodes matching search
   const searchResults: BookmarkNode[] = []
   if (search.length >= 2) {
     const q = search.toLowerCase()
@@ -103,31 +122,37 @@ export default function Sidebar({ bookmarks, activeId, onNavigate }: Props) {
   return (
     <aside className="w-72 md:w-80 border-r border-stone-200 dark:border-stone-800 flex flex-col bg-white dark:bg-stone-900 overflow-hidden flex-shrink-0">
       <div className="p-3 border-b border-stone-200 dark:border-stone-800">
+        <label htmlFor="sidebar-search" className="sr-only">검색</label>
         <input
-          type="text"
+          id="sidebar-search"
+          type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Хайх... (검색)"
           className="w-full px-3 py-1.5 text-sm rounded border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
       </div>
-      <nav className="flex-1 overflow-y-auto p-2">
+      <nav className="flex-1 overflow-y-auto p-2" role="tree" aria-label="목차">
         {search.length >= 2 ? (
           searchResults.length > 0 ? (
-            searchResults.map((node) => (
-              <button
-                key={node.id}
-                onClick={() => {
-                  onNavigate(node.id)
-                  setSearch("")
-                }}
-                className="w-full text-left px-3 py-2 rounded text-sm text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
-              >
-                {node.titleMn || node.title}
-              </button>
-            ))
+            <div role="listbox" aria-label="검색 결과">
+              {searchResults.map((node) => (
+                <button
+                  key={node.id}
+                  role="option"
+                  aria-selected={node.id === activeId}
+                  onClick={() => {
+                    onNavigate(node.id)
+                    setSearch("")
+                  }}
+                  className="w-full text-left px-3 py-2 rounded text-sm text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                >
+                  {node.titleMn || node.title}
+                </button>
+              ))}
+            </div>
           ) : (
-            <p className="text-sm text-stone-400 p-3">검색 결과 없음</p>
+            <p className="text-sm text-stone-400 p-3" role="status">검색 결과 없음</p>
           )
         ) : (
           bookmarks.children.map((child) => (

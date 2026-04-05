@@ -29,8 +29,8 @@ interface BookmarkNode {
 
 // --- Config ---
 
-const SOURCE = path.resolve('/home/gaul/myproject/divine office/parsed_data')
-const OUT = path.join(__dirname, '..', 'public', 'data')
+const SOURCE = path.resolve(process.env.DIVINE_OFFICE_SOURCE || path.join(__dirname, '..', 'source-data'))
+const OUT = path.join(process.cwd(), 'public', 'data')
 
 const DAY_NAMES_MN: Record<string, string> = {
   'Ням': 'Ням гараг',
@@ -464,6 +464,28 @@ function buildAll() {
 
   fs.writeFileSync(path.join(OUT, 'content.json'), JSON.stringify(contentObj, null, 0))
   fs.writeFileSync(path.join(OUT, 'bookmarks.json'), JSON.stringify(rootBookmark, null, 2))
+
+  // --- Write split content files ---
+  const groups: Record<string, Record<string, { title: string; titleMn: string; content: string; page?: number; level: number }>> = {
+    week1: {}, week2: {}, week3: {}, week4: {}, propers: {}, hymns: {},
+  }
+
+  for (const [id, section] of Object.entries(contentObj)) {
+    if (id.startsWith("week1")) groups.week1[id] = section
+    else if (id.startsWith("week2")) groups.week2[id] = section
+    else if (id.startsWith("week3")) groups.week3[id] = section
+    else if (id.startsWith("week4")) groups.week4[id] = section
+    else if (id.startsWith("propers")) groups.propers[id] = section
+    else if (id.startsWith("hymns")) groups.hymns[id] = section
+  }
+
+  const splitDir = path.join(OUT, "content")
+  fs.mkdirSync(splitDir, { recursive: true })
+  for (const [group, data] of Object.entries(groups)) {
+    fs.writeFileSync(path.join(splitDir, `${group}.json`), JSON.stringify(data, null, 0))
+  }
+
+  console.log(`  Split content: ${Object.entries(groups).map(([g, d]) => `${g}(${Object.keys(d).length})`).join(', ')}`)
 
   // Stats
   const leafSections = Object.keys(contentObj).length

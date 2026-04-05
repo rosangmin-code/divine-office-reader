@@ -26,3 +26,10 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   sidebarOpen: true,
   lastSectionId: null,
 }
+
+/** content 분할 단위: week1, week2, week3, week4, propers, hymns */
+export type ContentGroup = "week1" | "week2" | "week3" | "week4" | "propers" | "hymns"
+
+export const ALL_CONTENT_GROUPS: ContentGroup[] = [
+  "week1", "week2", "week3", "week4", "propers", "hymns"
+]
