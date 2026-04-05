@@ -279,8 +279,8 @@ function buildPropersSections(): { sections: Map<string, Section>, rootChildren:
     { pattern: /^ГЭГЭЭНТНҮҮДИЙН$/, id: 'propers-saints', title: '성인축일', titleMn: 'Гэгээнтнүүдийн' },
   ]
 
-  // Sunday/feast header pattern within seasons
-  const sundayRe = /^(.*ДАХЬ НЯМ ГАРАГ|ЭЗЭНИЙ БАЯР|.*ГЭГЭЭНТНИЙ|.*ГЭГЭЭНТНҮҮД|ХАМАГ ГЭГЭЭНТНҮҮД|.*БАПТИСТ.*)$/
+  // Sub-section headers within seasons: weekdays, Sundays, feasts
+  const sundayRe = /^(НЯМ ГАРАГ|ДАВАА ГАРАГ|МЯГМАР ГАРАГ|ЛХАГВА ГАРАГ|ПҮРЭВ ГАРАГ|БААСАН ГАРАГ|БЯМБА ГАРАГ|.*ДАХЬ НЯМ ГАРАГ|.*ДАХ НЯМ ГАРАГ|.*ДЭХ НЯМ ГАРАГ|.*ДЭХ ДОЛОО ХОНОГ|ЭЗЭНИЙ .*|АРИУН .*|ПЭНТИКОСТ|ГУРВАН ХОНОГ|ТЭНГЭРБУРХАНЫ .*|ТУЙЛЫН .*|ХРИСТИЙН .*|.*ДОЛОО ХОНОГУУД|.*ГЭГЭЭНТНИЙ|.*ГЭГЭЭНТНҮҮД|ХАМАГ ГЭГЭЭНТНҮҮД|.*БАПТИСТ.*)$/
 
   // Step 1: Find season boundaries
   const seasonBounds: { idx: number, id: string, title: string, titleMn: string }[] = []
@@ -405,47 +405,20 @@ function buildHymnsSections(): { sections: Map<string, Section>, rootChildren: s
   const sections = new Map<string, Section>()
   const rootChildren: string[] = []
 
-  // P1-2: Split hymns into individual entries
-  // Structure: TOC (numbered lines like "1.", "2.") + blank + title lines + blank + next TOC block
-  // After all TOCs, actual hymn lyrics appear
-  // Strategy: find Mongolian title lines (non-blank, non-number, non-МАГТУУ) and treat each as a hymn
+  // Hymn start pattern: "42. Есүс хамгийн нандин нэр юм аа"
+  const hymnStartRe = /^(\d+)\.\s+(.+)$/
 
-  // Skip TOC sections (lines that are just numbers like "1.", "2." or "МАГТУУ")
-  const tocRe = /^\d+\.?$/
-  const headerRe = /^МАГТУУ$/i
-
-  // Collect hymn boundaries: a hymn starts with a title line that isn't a TOC number
-  // and ends when the next title appears (separated by patterns)
-  const hymnStarts: { idx: number, title: string }[] = []
-  let inToc = true
-
+  // Find all hymn boundaries
+  const hymnStarts: { idx: number, num: number, title: string }[] = []
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i].trim()
-    if (!line || tocRe.test(line) || headerRe.test(line)) {
-      continue
-    }
-
-    // Check if this is a title line: non-empty, after blank or TOC block
-    // Titles are typically short uppercase or capitalized Mongolian lines
-    if (inToc) {
-      // First non-TOC content line marks the actual hymn content area
-      inToc = false
-    }
-
-    // Detect hymn title: preceded by blank line or start, and is relatively short
-    const prevLine = i > 0 ? allLines[i - 1].trim() : ''
-    const isPrevBlank = !prevLine || tocRe.test(prevLine) || headerRe.test(prevLine)
-    const isShortLine = line.length < 60
-
-    if (isPrevBlank && isShortLine && !tocRe.test(line)) {
-      // Check if next line is also non-blank (title might be multi-line) or is the start of lyrics
-      hymnStarts.push({ idx: i, title: line })
+    const m = line.match(hymnStartRe)
+    if (m) {
+      hymnStarts.push({ idx: i, num: parseInt(m[1]), title: m[2] })
     }
   }
 
-  // Build hymn sections
   if (hymnStarts.length === 0) {
-    // Fallback: single blob
     const id = 'hymns-all'
     sections.set(id, {
       id, title: '찬미가', titleMn: 'Магтуу',
@@ -453,21 +426,18 @@ function buildHymnsSections(): { sections: Map<string, Section>, rootChildren: s
     })
     rootChildren.push(id)
   } else {
-    let counter = 0
     for (let h = 0; h < hymnStarts.length; h++) {
-      counter++
       const start = hymnStarts[h]
       const endIdx = h + 1 < hymnStarts.length ? hymnStarts[h + 1].idx : allLines.length
       const hymnLines = allLines.slice(start.idx, endIdx)
       const content = cleanContent(hymnLines)
 
-      // Skip very short entries (likely TOC artifacts)
       if (content.length < 10) continue
 
-      const id = `hymns-${counter}`
+      const id = `hymns-${start.num}`
       sections.set(id, {
         id,
-        title: `${counter}. ${start.title}`,
+        title: `${start.num}. ${start.title}`,
         titleMn: start.title,
         level: 4,
         content,
