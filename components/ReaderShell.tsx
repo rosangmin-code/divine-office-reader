@@ -8,6 +8,7 @@ import { BookmarkNode } from "@/lib/types"
 import { loadSettings } from "@/lib/reader-store"
 import Sidebar from "./Sidebar"
 import Toolbar from "./Toolbar"
+import Breadcrumb from "./Breadcrumb"
 
 interface Props {
   bookmarks: BookmarkNode
@@ -20,8 +21,7 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   const { content, loadGroup } = useSectionLoader({})
   const pendingScrollId = useRef<string | null>(null)
 
-  // Load the first group on mount — reads lastSectionId directly from storage
-  // to avoid depending on settings state (which would re-trigger on every change)
+  // Load the first group on mount
   useEffect(() => {
     if (!hydrated) return
     const { lastSectionId } = loadSettings()
@@ -33,7 +33,6 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   }, [hydrated, orderedIds, loadGroup])
 
   // Sync lastSectionId to localStorage when the viewport-tracked section changes.
-  // This lives here (not in useActiveSection) because persistence is a ReaderShell concern.
   useEffect(() => {
     if (activeId) {
       updateSetting("lastSectionId", activeId)
@@ -75,7 +74,7 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   }, [loadGroup, scrollTo, updateSetting])
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-[100dvh] flex flex-col">
       <Toolbar
         settings={settings}
         onToggleSidebar={() => updateSetting("sidebarOpen", !settings.sidebarOpen)}
@@ -84,10 +83,15 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
         }
         onToggleDark={() => updateSetting("darkMode", !settings.darkMode)}
       />
+      <Breadcrumb bookmarks={bookmarks} activeId={activeId} />
       <div className="flex flex-1 overflow-hidden">
-        {settings.sidebarOpen && (
-          <Sidebar bookmarks={bookmarks} activeId={activeId} onNavigate={handleNavigate} />
-        )}
+        <Sidebar
+          bookmarks={bookmarks}
+          activeId={activeId}
+          onNavigate={handleNavigate}
+          open={settings.sidebarOpen}
+          onClose={() => updateSetting("sidebarOpen", false)}
+        />
         <main
           className="flex-1 overflow-y-auto px-4 py-8 md:px-12 lg:px-20"
           style={hydrated ? { fontSize: `${settings.fontSize}px` } : undefined}
@@ -95,9 +99,23 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
           <div className="max-w-3xl mx-auto">
             {orderedIds.map((id) => {
               const section = content[id]
-              if (!section) return null
+              if (!section) {
+                return (
+                  <div key={id} className="mb-12 animate-pulse">
+                    <div className="h-3 w-48 bg-stone-200 dark:bg-stone-800 rounded mb-4" />
+                    <div className="space-y-2.5">
+                      <div className="h-4 bg-stone-100 dark:bg-stone-800/60 rounded w-full" />
+                      <div className="h-4 bg-stone-100 dark:bg-stone-800/60 rounded w-5/6" />
+                      <div className="h-4 bg-stone-100 dark:bg-stone-800/60 rounded w-4/6" />
+                      <div className="h-4 bg-stone-100 dark:bg-stone-800/60 rounded w-full" />
+                      <div className="h-4 bg-stone-100 dark:bg-stone-800/60 rounded w-3/6" />
+                    </div>
+                    <hr className="mt-8 border-stone-200 dark:border-stone-800" />
+                  </div>
+                )
+              }
               return (
-                <article key={id} id={id} className="mb-12 scroll-mt-16">
+                <article key={id} id={id} className="mb-12 scroll-mt-20">
                   <h3 className="text-sm font-medium text-stone-400 dark:text-stone-500 mb-2 uppercase tracking-wide">
                     {section.titleMn}
                   </h3>
