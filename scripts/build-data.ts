@@ -30,7 +30,7 @@ interface BookmarkNode {
 // --- Config ---
 
 const SOURCE = path.resolve(process.env.DIVINE_OFFICE_SOURCE || path.join(__dirname, '..', 'source-data'))
-const OUT = path.join(__dirname, '..', 'public', 'data')
+const OUT = path.join(process.cwd(), 'public', 'data')
 
 const DAY_NAMES_MN: Record<string, string> = {
   'Ням': 'Ням гараг',
