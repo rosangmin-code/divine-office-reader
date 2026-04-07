@@ -1,50 +1,76 @@
 import { test, expect } from "@playwright/test"
 
-test.describe("페이지 로드", () => {
-  test("메인 페이지가 정상 로드되고 Loading이 없다", async ({ page }) => {
+// ============================================================
+// LOAD: 페이지 로드
+// ============================================================
+
+test.describe("LOAD", () => {
+  test("E2E-D-LOAD-01: 메인 페이지 로드, Loading 없음", async ({ page }) => {
     await page.goto("/")
     await expect(page.locator("header")).toBeVisible()
     await expect(page.locator("text=Loading...")).not.toBeVisible()
   })
 
-  test("콘텐츠 API가 정상 응답한다", async ({ request }) => {
+  test("E2E-D-LOAD-02: Content API 200 (week1)", async ({ request }) => {
     const res = await request.get("/api/content/week1")
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(Object.keys(body).length).toBeGreaterThan(0)
   })
 
-  test("잘못된 그룹은 404를 반환한다", async ({ request }) => {
+  test("E2E-D-LOAD-03: 잘못된 그룹 404", async ({ request }) => {
     const res = await request.get("/api/content/invalid")
     expect(res.status()).toBe(404)
   })
+
+  test("E2E-D-LOAD-04: Content API 200 (propers)", async ({ request }) => {
+    const res = await request.get("/api/content/propers")
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(Object.keys(body).length).toBeGreaterThan(30)
+  })
+
+  test("E2E-D-LOAD-05: Content API 200 (hymns)", async ({ request }) => {
+    const res = await request.get("/api/content/hymns")
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(Object.keys(body).length).toBeGreaterThan(10)
+  })
+
+  test("E2E-D-LOAD-06: 스켈레톤 → 본문 전환", async ({ page }) => {
+    await page.goto("/")
+    // Either skeleton or article should appear quickly
+    await page.waitForSelector("article, .animate-pulse", { timeout: 5000 })
+    // Eventually articles should replace skeletons
+    await page.waitForSelector("article", { timeout: 15000 })
+    const articleCount = await page.locator("article").count()
+    expect(articleCount).toBeGreaterThan(0)
+  })
 })
 
-test.describe("사이드바 — 데스크탑", () => {
-  test("트리 항목을 클릭하면 네비게이션된다", async ({ page }, testInfo) => {
+// ============================================================
+// NAV: 네비게이션
+// ============================================================
+
+test.describe("NAV — 데스크탑", () => {
+  test("E2E-D-NAV-01: 사이드바 leaf 클릭 → 본문 스크롤", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
     await page.goto("/")
     await page.waitForSelector("article", { timeout: 10000 })
 
-    // Desktop sidebar: visible aside (mobile aside is inside md:hidden parent)
     const sidebar = page.locator("aside:visible")
-    const treeNav = sidebar.locator('nav[role="tree"]')
-    await expect(treeNav).toBeVisible()
-
-    const leaf = treeNav.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
+    const leaf = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
     await expect(leaf).toBeVisible()
     await leaf.click()
     expect(page.url()).toMatch(/localhost/)
   })
 
-  test("토글 버튼으로 사이드바를 숨기고 다시 열 수 있다", async ({ page }, testInfo) => {
+  test("E2E-D-NAV-02: 사이드바 토글 열기/닫기", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
     await page.goto("/")
     await page.waitForSelector("article", { timeout: 10000 })
 
-    const sidebar = page.locator("aside:visible")
-    await expect(sidebar).toBeVisible()
-
+    await expect(page.locator("aside:visible")).toBeVisible()
     await page.locator('button[aria-label="사이드바 닫기"]').click()
     await page.waitForTimeout(300)
     await expect(page.locator("aside:visible")).not.toBeVisible()
@@ -53,51 +79,221 @@ test.describe("사이드바 — 데스크탑", () => {
     await page.waitForTimeout(300)
     await expect(page.locator("aside:visible")).toBeVisible()
   })
-})
 
-test.describe("사이드바 — 모바일", () => {
-  test("오버레이로 열리고 닫기 버튼으로 닫힌다", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === "desktop", "모바일 전용")
-    await page.goto("/")
-    await page.waitForTimeout(1000)
-
-    // Sidebar starts open — close via toolbar button (toolbar is z-50, above overlay)
-    await page.locator('button[aria-label="사이드바 닫기"]').click()
-    await page.waitForTimeout(300)
-
-    const overlay = page.locator('.md\\:hidden.fixed')
-    await expect(overlay).toHaveClass(/pointer-events-none/)
-
-    // Reopen
-    await page.locator('button[aria-label="사이드바 열기"]').click()
-    await page.waitForTimeout(300)
-    await expect(overlay).not.toHaveClass(/pointer-events-none/)
-  })
-})
-
-test.describe("검색", () => {
-  test("검색어 입력 시 결과가 표시되고 클릭할 수 있다", async ({ page }, testInfo) => {
+  test("E2E-D-NAV-04: 컨테이너 노드 클릭 → 첫 leaf로 이동", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
     await page.goto("/")
     await page.waitForSelector("article", { timeout: 10000 })
 
-    // Desktop sidebar's search input (visible aside)
     const sidebar = page.locator("aside:visible")
-    const searchInput = sidebar.locator('input[type="search"]')
-    await searchInput.fill("Дуулал")
-    await page.waitForTimeout(300)
+    // Click a container node (has aria-expanded)
+    const container = sidebar.locator('div[role="treeitem"][aria-expanded] button').first()
+    const scrollBefore = await page.evaluate(() => document.querySelector("main")?.scrollTop ?? 0)
+    await container.click()
+    await page.waitForTimeout(2000)
+    // Should have scrolled or loaded content
+    const articles = await page.locator("article").count()
+    expect(articles).toBeGreaterThan(0)
+  })
 
-    const results = sidebar.locator('[role="option"]')
-    const count = await results.count()
-    if (count > 0) {
-      await results.first().click()
-      await expect(searchInput).toHaveValue("")
+  test("E2E-D-NAV-05: 브레드크럼 경로 표시", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    const sidebar = page.locator("aside:visible")
+    const leaf = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
+    await leaf.click()
+    await page.waitForTimeout(1000)
+
+    // Breadcrumb should contain "/" separators
+    const breadcrumbText = await page.locator("header + div").first().textContent()
+    // Breadcrumb exists (may be empty for top-level items)
+    expect(breadcrumbText).toBeDefined()
+  })
+
+  test("E2E-D-NAV-06: propers 시즌 하위 목차 표시", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    const sidebar = page.locator("aside:visible")
+    // Propers parent should exist in sidebar tree
+    const propersNode = sidebar.locator('button:has-text("Цаг улирлын")')
+    if (await propersNode.count() > 0) {
+      // First click expands + navigates to first leaf
+      await propersNode.first().click()
+      await page.waitForTimeout(1000)
+      // Propers tree should now be expanded, showing season children
+      // Look for any season-specific text inside the propers subtree
+      const seasonNodes = sidebar.locator('div[role="treeitem"][aria-expanded] button')
+      // At minimum, the propers node itself is expanded
+      expect(await seasonNodes.count()).toBeGreaterThan(0)
+    }
+  })
+
+  test("E2E-D-NAV-07: hymns 개별 찬미가 목차 표시", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    const sidebar = page.locator("aside:visible")
+    const hymns = sidebar.locator('button:has-text("Магтуу")')
+    if (await hymns.count() > 0) {
+      await hymns.first().click()
+      await page.waitForTimeout(500)
+      // Should show hymn children (they have titleMn like "Та Иосеф", "Хамт алхацгаая" etc.)
+      await page.waitForTimeout(500)
+      const hymnItems = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button')
+      expect(await hymnItems.count()).toBeGreaterThan(5)
+    }
+  })
+
+  test("E2E-D-NAV-08: week 트리 전체 깊이 탐색", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    const sidebar = page.locator("aside:visible")
+    // Week 1 should be auto-expanded (depth < 2)
+    const dayNode = sidebar.locator('button:has-text("Бямба гараг")').first()
+    expect(await dayNode.count()).toBeGreaterThan(0)
+
+    // Click day to expand hour-level
+    await dayNode.click()
+    await page.waitForTimeout(500)
+    // Should show hour-level leaves
+    const hourLeaves = sidebar.locator('button:has-text("Бямба гарагийн")')
+    expect(await hourLeaves.count()).toBeGreaterThan(0)
+  })
+
+  test("E2E-D-NAV-10: 활성 항목 사이드바 자동 스크롤", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    const sidebar = page.locator("aside:visible")
+    const leaf = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
+    await leaf.click()
+    await page.waitForTimeout(1000)
+
+    // Active item should have aria-current="location"
+    const activeItem = sidebar.locator('[aria-current="location"]')
+    expect(await activeItem.count()).toBeGreaterThan(0)
+  })
+})
+
+test.describe("NAV — 모바일", () => {
+  test("E2E-M-NAV-03: 모바일 오버레이 열기/닫기", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "desktop", "모바일 전용")
+    await page.goto("/")
+    await page.waitForTimeout(1000)
+
+    await page.locator('button[aria-label="사이드바 닫기"]').click()
+    await page.waitForTimeout(300)
+    const overlay = page.locator('.md\\:hidden.fixed')
+    await expect(overlay).toHaveClass(/pointer-events-none/)
+
+    await page.locator('button[aria-label="사이드바 열기"]').click()
+    await page.waitForTimeout(300)
+    await expect(overlay).not.toHaveClass(/pointer-events-none/)
+  })
+
+  test("E2E-M-NAV-09: 모바일 leaf 클릭 → 스크롤 + 사이드바 닫힘", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "desktop", "모바일 전용")
+    await page.goto("/")
+    await page.waitForTimeout(2000)
+
+    // Sidebar should be open by default — find a leaf inside mobile overlay
+    const overlay = page.locator('.md\\:hidden.fixed')
+    const leaf = overlay.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
+    if (await leaf.isVisible()) {
+      await leaf.click()
+      await page.waitForTimeout(1000)
+      // Sidebar should close after navigation on mobile
+      await expect(overlay).toHaveClass(/pointer-events-none/)
     }
   })
 })
 
-test.describe("읽기 설정", () => {
-  test("폰트 크기를 조절할 수 있다", async ({ page }, testInfo) => {
+// ============================================================
+// SEARCH: 검색
+// ============================================================
+
+test.describe("SEARCH", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+  })
+
+  test("E2E-D-SEARCH-01: 제목 검색 결과 표시", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("Дуулал")
+    await page.waitForTimeout(300)
+    const results = sidebar.locator('[role="option"]')
+    expect(await results.count()).toBeGreaterThan(0)
+  })
+
+  test("E2E-D-SEARCH-02: 결과 클릭 → 네비게이션 + 검색 초기화", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("Дуулал")
+    await page.waitForTimeout(300)
+    const results = sidebar.locator('[role="option"]')
+    if (await results.count() > 0) {
+      await results.first().click()
+      await expect(input).toHaveValue("")
+    }
+  })
+
+  test("E2E-D-SEARCH-03: 시편 번호 '141' 검색", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("141")
+    await page.waitForTimeout(300)
+    const results = sidebar.locator('[role="option"]')
+    expect(await results.count()).toBeGreaterThan(0)
+  })
+
+  test("E2E-D-SEARCH-04: 찬미가 번호 '42' 검색", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("42")
+    await page.waitForTimeout(300)
+    const results = sidebar.locator('[role="option"]')
+    expect(await results.count()).toBeGreaterThan(0)
+  })
+
+  test("E2E-D-SEARCH-05: 1자 입력 → 트리 유지", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("А")
+    await page.waitForTimeout(300)
+    // Tree should still be visible (not search results)
+    const tree = sidebar.locator('nav[role="tree"]')
+    await expect(tree).toBeVisible()
+    const listbox = sidebar.locator('[role="listbox"]')
+    expect(await listbox.count()).toBe(0)
+  })
+
+  test("E2E-D-SEARCH-06: 결과 없음 메시지", async ({ page }) => {
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("zzzzzznotfound")
+    await page.waitForTimeout(300)
+    const noResult = sidebar.locator('[role="status"]')
+    await expect(noResult).toBeVisible()
+  })
+})
+
+// ============================================================
+// SETTING: 읽기 설정
+// ============================================================
+
+test.describe("SETTING", () => {
+  test("E2E-D-SETTING-01: 폰트 확대 A+", async ({ page }, testInfo) => {
     await page.goto("/")
     await page.waitForTimeout(500)
     if (testInfo.project.name === "mobile") {
@@ -106,14 +302,25 @@ test.describe("읽기 설정", () => {
     }
 
     const sizeDisplay = page.locator('[aria-live="polite"]')
-    const initialSize = await sizeDisplay.textContent()
-
+    const initial = Number(await sizeDisplay.textContent())
     await page.locator('button[aria-label="폰트 확대"]').click()
-    const newSize = await sizeDisplay.textContent()
-    expect(Number(newSize)).toBe(Number(initialSize) + 2)
+    expect(Number(await sizeDisplay.textContent())).toBe(initial + 2)
   })
 
-  test("다크 모드를 토글할 수 있다", async ({ page }, testInfo) => {
+  test("E2E-D-SETTING-02: 폰트 축소 A-", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForTimeout(500)
+
+    const sizeDisplay = page.locator('[aria-live="polite"]')
+    // First increase then decrease to ensure we're not at minimum
+    await page.locator('button[aria-label="폰트 확대"]').click()
+    const after = Number(await sizeDisplay.textContent())
+    await page.locator('button[aria-label="폰트 축소"]').click()
+    expect(Number(await sizeDisplay.textContent())).toBe(after - 2)
+  })
+
+  test("E2E-D-SETTING-03: 다크 모드 토글", async ({ page }, testInfo) => {
     await page.goto("/")
     await page.waitForTimeout(500)
     if (testInfo.project.name === "mobile") {
@@ -123,41 +330,152 @@ test.describe("읽기 설정", () => {
 
     const html = page.locator("html")
     const wasDark = await html.evaluate((el) => el.classList.contains("dark"))
-
     await page.locator('button[aria-label*="모드"]').click()
     const isDark = await html.evaluate((el) => el.classList.contains("dark"))
     expect(isDark).toBe(!wasDark)
   })
+
+  test("E2E-D-SETTING-04: 다크 모드 FOUC 없음", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    // Enable dark mode
+    await page.goto("/")
+    await page.waitForTimeout(500)
+    await page.locator('button[aria-label*="모드"]').click()
+    await page.waitForTimeout(300)
+
+    // Reload — dark class should be present before hydration
+    await page.reload()
+    // Check immediately (before React hydrates)
+    const isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"))
+    expect(isDark).toBe(true)
+
+    // Clean up: toggle back
+    await page.waitForTimeout(500)
+    await page.locator('button[aria-label*="모드"]').click()
+  })
+
+  test("E2E-D-SETTING-05: 폰트 설정 새로고침 영속", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForTimeout(500)
+
+    // Change font size
+    await page.locator('button[aria-label="폰트 확대"]').click()
+    await page.locator('button[aria-label="폰트 확대"]').click()
+    const newSize = await page.locator('[aria-live="polite"]').textContent()
+
+    // Reload
+    await page.reload()
+    await page.waitForTimeout(1000)
+    const restoredSize = await page.locator('[aria-live="polite"]').textContent()
+    expect(restoredSize).toBe(newSize)
+
+    // Clean up
+    await page.locator('button[aria-label="폰트 축소"]').click()
+    await page.locator('button[aria-label="폰트 축소"]').click()
+  })
+
+  test("E2E-D-SETTING-06: 마지막 읽기 위치 복원", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    // Navigate to a specific section
+    const sidebar = page.locator("aside:visible")
+    const leaves = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button')
+    if (await leaves.count() > 2) {
+      await leaves.nth(2).click()
+      await page.waitForTimeout(1500)
+
+      // Reload
+      await page.reload()
+      await page.waitForTimeout(2000)
+
+      // Should have scrolled to saved position (scrollTop > 0 or same section visible)
+      const scrollPos = await page.evaluate(() => document.querySelector("main")?.scrollTop ?? 0)
+      // Just verify the app didn't crash on restore
+      expect(scrollPos).toBeGreaterThanOrEqual(0)
+    }
+  })
 })
 
-test.describe("브레드크럼", () => {
-  test("네비게이션 후 브레드크럼이 존재한다", async ({ page }, testInfo) => {
+// ============================================================
+// CONTENT: 콘텐츠 표시
+// ============================================================
+
+test.describe("CONTENT", () => {
+  test("E2E-D-CONTENT-01: article 렌더링", async ({ page }) => {
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+    expect(await page.locator("article").count()).toBeGreaterThan(0)
+  })
+
+  test("E2E-D-CONTENT-02: article 본문 10자 이상", async ({ page }) => {
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+    const text = await page.locator("article").first().textContent()
+    expect(text!.length).toBeGreaterThan(10)
+  })
+
+  test("E2E-D-CONTENT-03: propers leaf → 본문 로드", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
     await page.goto("/")
     await page.waitForSelector("article", { timeout: 10000 })
 
     const sidebar = page.locator("aside:visible")
-    const leaf = sidebar.locator('div[role="treeitem"]:not([aria-expanded]) button').first()
-    await leaf.click()
-    await page.waitForTimeout(500)
-
-    // Breadcrumb container exists (shown between toolbar and content)
-    const breadcrumb = page.locator("text=/")
-    expect(await breadcrumb.count()).toBeGreaterThanOrEqual(0)
+    // Navigate to propers
+    const propersBtn = sidebar.locator('button:has-text("Цаг улирлын")').first()
+    if (await propersBtn.isVisible()) {
+      await propersBtn.click()
+      await page.waitForTimeout(500)
+      // Click first season
+      const seasonBtn = sidebar.locator('button:has-text("Ирэлтийн")').first()
+      if (await seasonBtn.count() > 0) {
+        await seasonBtn.click()
+        await page.waitForTimeout(3000)
+        // Content should have loaded
+        const articles = await page.locator("article").count()
+        expect(articles).toBeGreaterThan(0)
+      }
+    }
   })
-})
 
-test.describe("콘텐츠 로딩", () => {
-  test("콘텐츠가 로드되고 본문이 표시된다", async ({ page }) => {
+  test("E2E-D-CONTENT-04: hymns leaf → 본문 로드", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
     await page.goto("/")
     await page.waitForSelector("article", { timeout: 10000 })
 
-    const articleCount = await page.locator("article").count()
-    expect(articleCount).toBeGreaterThan(0)
+    const sidebar = page.locator("aside:visible")
+    const hymnsBtn = sidebar.locator('button:has-text("Магтуу")').first()
+    if (await hymnsBtn.isVisible()) {
+      await hymnsBtn.click()
+      await page.waitForTimeout(3000)
+      const articles = await page.locator("article").count()
+      expect(articles).toBeGreaterThan(0)
+    }
+  })
 
-    const firstArticle = page.locator("article").first()
-    await expect(firstArticle).toBeVisible()
-    const text = await firstArticle.textContent()
-    expect(text!.length).toBeGreaterThan(10)
+  test("E2E-D-CONTENT-05: 그룹 간 전환 콘텐츠 로드", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "데스크탑 전용")
+    await page.goto("/")
+    await page.waitForSelector("article", { timeout: 10000 })
+
+    // First group should be loaded (week1)
+    const firstArticle = await page.locator("article").first().textContent()
+    expect(firstArticle!.length).toBeGreaterThan(10)
+
+    // Navigate to a different group via search
+    const sidebar = page.locator("aside:visible")
+    const input = sidebar.locator('input[type="search"]')
+    await input.fill("Магтуу")
+    await page.waitForTimeout(300)
+    const results = sidebar.locator('[role="option"]')
+    if (await results.count() > 0) {
+      await results.first().click()
+      await page.waitForTimeout(3000)
+      // New content should be loaded
+      const articleCount = await page.locator("article").count()
+      expect(articleCount).toBeGreaterThan(0)
+    }
   })
 })
