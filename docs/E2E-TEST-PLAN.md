@@ -82,6 +82,16 @@ E2E-{viewport}-{category}-{number}
 | E2E-D-CONTENT-04 | hymns leaf 클릭 → 본문 로드 | Desktop | F-LAZY, F-NAV | S4 |
 | E2E-D-CONTENT-05 | week 그룹 간 전환 시 콘텐츠 로드 | Desktop | F-LAZY | S1 |
 
+### FLOW: 기도 흐름 — 교차 그룹 네비게이션
+
+| 테스트 ID | 설명 | Viewport | PRD 기능 | 시나리오 |
+|-----------|------|----------|----------|----------|
+| E2E-D-FLOW-01 | 시편집 연속 섹션 스크롤 연결 (서로 다른 ID) | Desktop | F-NAV | S1, S9 |
+| E2E-D-FLOW-02 | 시편집 → 찬미가 → 시편집 교차 이동 (사이드바) | Desktop | F-NAV, F-LAZY | S1, S9 |
+| E2E-D-FLOW-03 | 시편집 → 고유문 → 시편집 교차 이동 (사이드바) | Desktop | F-NAV, F-LAZY | S2, S9 |
+| E2E-D-FLOW-04 | 본문 내 페이지 참조(х. NNN) 존재 확인 | Desktop | F-XNAV (문서화) | S1, S9 |
+| E2E-M-FLOW-05 | 모바일 교차 그룹 이동 후 사이드바 닫힘 | Mobile | F-MOBILE, F-NAV | S1 |
+
 ---
 
 ## 3. 요구사항 추적 매트릭스 (RTM)
