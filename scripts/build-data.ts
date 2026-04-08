@@ -18,6 +18,7 @@ interface Section {
   content: string    // raw text content (for leaf sections)
   page?: number
   children: string[]
+  liturgicalRole?: string
 }
 
 interface BookmarkNode {
@@ -70,6 +71,7 @@ function slugify(s: string): string {
 /**
  * Extract a descriptive subtitle from the section content.
  * Looks for psalm references, canticle names, readings, etc.
+ * Searches up to first 20 non-empty lines for better coverage.
  */
 function extractSubtitle(lines: string[]): string {
   const psalmRe = /^(Дуулал\s+\d+[:\d\-,\s]*)/
@@ -77,8 +79,14 @@ function extractSubtitle(lines: string[]): string {
   const readingRe = /^(Уншлага|Хариу залбирал|Гуйлтын залбирал|Төгсгөлийн даатгал залбирал|Урих дуудлага)/
   const scriptureRe = /^(\d\s+\w+\s+\d+[:\d\-]+|Ром\s+\d+|Колоссай|Илчлэл|Эфэс|Филиппой)/
 
+  // Check up to first 20 non-empty lines
+  let checked = 0
   for (const line of lines) {
     const s = line.trim()
+    if (!s) continue
+    checked++
+    if (checked > 20) break
+
     const pm = s.match(psalmRe)
     if (pm) return pm[1].trim()
     const cm = s.match(canticleRe)
@@ -89,6 +97,22 @@ function extractSubtitle(lines: string[]): string {
     if (sm) return sm[1].trim()
   }
   return ''
+}
+
+/**
+ * Classify a section's liturgical role from its subtitle.
+ */
+function classifyLiturgicalRole(subtitle: string): string {
+  if (!subtitle) return 'continuation'
+  if (subtitle.startsWith('Дуулал')) return 'psalm'
+  if (subtitle === 'Мариагийн магтаал' || subtitle === 'Захариасын магтаал' || subtitle === 'Симеоны магтаал') return 'gospel-canticle'
+  if (subtitle === 'Магтаал' || subtitle === 'Шад магтаал' || subtitle === 'Хурганы хурим') return 'canticle'
+  if (subtitle === 'Уншлага') return 'reading'
+  if (subtitle === 'Хариу залбирал') return 'responsory'
+  if (subtitle === 'Гуйлтын залбирал') return 'intercessions'
+  if (subtitle === 'Төгсгөлийн даатгал залбирал') return 'concluding'
+  if (subtitle === 'Урих дуудлага') return 'invitatory'
+  return 'continuation'
 }
 
 function readFile(filePath: string): string {
@@ -209,6 +233,8 @@ function buildWeekSections(weekNum: number): { sections: Map<string, Section>, r
     const fullTitle = subtitle ? `${hourLabel} — ${subtitle}` : `${hourLabel}`
     const fullTitleMn = subtitle ? `${raw.dayMn} гарагийн ${raw.hourMn === 'оройн' ? 'орой' : raw.hourMn} — ${subtitle}` : `${raw.dayMn} гарагийн ${raw.hourMn === 'оройн' ? 'орой' : raw.hourMn}`
 
+    const liturgicalRole = classifyLiturgicalRole(subtitle)
+
     sections.set(sectionId, {
       id: sectionId,
       title: fullTitle,
@@ -217,6 +243,7 @@ function buildWeekSections(weekNum: number): { sections: Map<string, Section>, r
       content,
       page,
       children: [],
+      liturgicalRole,
     })
 
     const dayKey = raw.dayMn
@@ -571,7 +598,7 @@ function buildAll() {
   fs.mkdirSync(OUT, { recursive: true })
 
   // Content: flat map of id -> section data
-  const contentObj: Record<string, { title: string; titleMn: string; content: string; page?: number; level: number }> = {}
+  const contentObj: Record<string, { title: string; titleMn: string; content: string; page?: number; level: number; liturgicalRole?: string }> = {}
   allSections.forEach((section) => {
     if (section.content || section.children.length === 0) {
       contentObj[section.id] = {
@@ -580,12 +607,18 @@ function buildAll() {
         content: section.content,
         page: section.page,
         level: section.level,
+        ...(section.liturgicalRole ? { liturgicalRole: section.liturgicalRole } : {}),
       }
     }
   })
 
   fs.writeFileSync(path.join(OUT, 'content.json'), JSON.stringify(contentObj, null, 0))
   fs.writeFileSync(path.join(OUT, 'bookmarks.json'), JSON.stringify(rootBookmark, null, 2))
+
+  // --- Prayer Flow Manifest ---
+  const prayerFlows = buildPrayerFlow(allSections)
+  fs.writeFileSync(path.join(OUT, 'prayer-flow.json'), JSON.stringify(prayerFlows, null, 2))
+  console.log(`  Prayer flows: ${prayerFlows.length} (4 weeks × 7 days × 2 hours)`)
 
   // --- Write split content files ---
   const groups: Record<string, Record<string, { title: string; titleMn: string; content: string; page?: number; level: number }>> = {
@@ -622,6 +655,178 @@ function buildAll() {
 
   // P2-1: Build QA
   validateOutput(contentObj)
+}
+
+// --- Prayer Flow Manifest ---
+
+interface PrayerFlowStep {
+  order: number
+  liturgicalRole: string
+  label: string
+  labelMn: string
+  source: 'psalter' | 'propers' | 'hymns' | 'fixed'
+  sectionId?: string
+  pageRef?: number
+  isGap: boolean
+}
+
+interface PrayerFlow {
+  week: number
+  day: string
+  dayKo: string
+  hour: 'morning' | 'evening'
+  steps: PrayerFlowStep[]
+}
+
+const MORNING_ORDER: { role: string; label: string; labelMn: string; source: 'psalter' | 'propers' | 'hymns' | 'fixed'; pageRef?: number }[] = [
+  { role: 'opening', label: '시작 기원', labelMn: 'Эхлэл', source: 'fixed', pageRef: 44 },
+  { role: 'invitatory', label: '초대찬미 (시편 95)', labelMn: 'Урих дуудлага (Дуулал 95)', source: 'psalter', pageRef: 28 },
+  { role: 'hymn', label: '찬미가', labelMn: 'Магтуу', source: 'hymns' },
+  { role: 'psalm', label: '시편 1', labelMn: 'Дуулал 1', source: 'psalter' },
+  { role: 'canticle', label: '구약 찬가', labelMn: 'Магтаал', source: 'psalter' },
+  { role: 'psalm-2', label: '시편 2', labelMn: 'Дуулал 2', source: 'psalter' },
+  { role: 'reading', label: '짧은 독서', labelMn: 'Уншлага', source: 'propers' },
+  { role: 'responsory', label: '짧은 응답송', labelMn: 'Хариу залбирал', source: 'propers' },
+  { role: 'gospel-canticle', label: '베네딕투스 (복음 찬가)', labelMn: 'Захариасын магтаал', source: 'psalter' },
+  { role: 'intercessions', label: '청원 기도', labelMn: 'Гуйлтын залбирал', source: 'psalter' },
+  { role: 'our-father', label: '주님의 기도', labelMn: 'Тэнгэр дэх Эцэг минь ээ...', source: 'fixed' },
+  { role: 'concluding', label: '마침 기도', labelMn: 'Төгсгөлийн даатгал залбирал', source: 'propers' },
+  { role: 'dismissal', label: '파견', labelMn: 'Төгсгөл', source: 'fixed', pageRef: 44 },
+]
+
+const EVENING_ORDER: { role: string; label: string; labelMn: string; source: 'psalter' | 'propers' | 'hymns' | 'fixed'; pageRef?: number }[] = [
+  { role: 'opening', label: '시작 기원', labelMn: 'Эхлэл', source: 'fixed', pageRef: 38 },
+  { role: 'hymn', label: '찬미가', labelMn: 'Магтуу', source: 'hymns' },
+  { role: 'psalm', label: '시편 1', labelMn: 'Дуулал 1', source: 'psalter' },
+  { role: 'psalm-2', label: '시편 2', labelMn: 'Дуулал 2', source: 'psalter' },
+  { role: 'canticle', label: '신약 찬가', labelMn: 'Шад магтаал', source: 'psalter' },
+  { role: 'reading', label: '짧은 독서', labelMn: 'Уншлага', source: 'propers' },
+  { role: 'responsory', label: '짧은 응답송', labelMn: 'Хариу залбирал', source: 'propers' },
+  { role: 'gospel-canticle', label: '마니피캇 (복음 찬가)', labelMn: 'Мариагийн магтаал', source: 'psalter' },
+  { role: 'intercessions', label: '청원 기도', labelMn: 'Гуйлтын залбирал', source: 'psalter' },
+  { role: 'our-father', label: '주님의 기도', labelMn: 'Тэнгэр дэх Эцэг минь ээ...', source: 'fixed' },
+  { role: 'concluding', label: '마침 기도', labelMn: 'Төгсгөлийн даатгал залбирал', source: 'propers' },
+  { role: 'dismissal', label: '파견', labelMn: 'Төгсгөл', source: 'fixed', pageRef: 38 },
+]
+
+function buildPrayerFlow(allSections: Map<string, Section>): PrayerFlow[] {
+  const flows: PrayerFlow[] = []
+  const dayKeys = ['Бямба', 'Ням', 'Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан']
+  const hours: ('morning' | 'evening')[] = ['morning', 'evening']
+  const hourMnMap = { morning: 'өглөө', evening: 'орой' }
+
+  for (let w = 1; w <= 4; w++) {
+    for (const dayMn of dayKeys) {
+      for (const hour of hours) {
+        const hourMn = hourMnMap[hour]
+        const daySlug = slugify(dayMn)
+
+        // Collect all psalter sections for this week/day/hour
+        const prefix = `week${w}-${daySlug}-${slugify(hourMn)}`
+        const psalterSections: Section[] = []
+        for (const [id, section] of allSections) {
+          if (id.startsWith(prefix) && section.level === 5) {
+            psalterSections.push(section)
+          }
+        }
+
+        if (psalterSections.length === 0) continue
+
+        const template = hour === 'morning' ? MORNING_ORDER : EVENING_ORDER
+        const steps: PrayerFlowStep[] = []
+        let order = 0
+
+        // Track which psalter sections have been assigned
+        const assigned = new Set<string>()
+
+        // For each template step, try to find a matching psalter section
+        let psalmCount = 0
+        for (const tmpl of template) {
+          order++
+          const step: PrayerFlowStep = {
+            order,
+            liturgicalRole: tmpl.role,
+            label: tmpl.label,
+            labelMn: tmpl.labelMn,
+            source: tmpl.source,
+            isGap: false,
+          }
+
+          if (tmpl.source === 'fixed') {
+            step.isGap = true
+            if (tmpl.pageRef) step.pageRef = tmpl.pageRef
+          } else if (tmpl.source === 'hymns') {
+            // Hymn: no specific section, user must choose
+            step.isGap = false
+          } else if (tmpl.source === 'propers') {
+            // Propers: season-dependent, no fixed section
+            step.isGap = false
+          } else if (tmpl.source === 'psalter') {
+            // Try to find matching psalter section by liturgical role
+            const targetRole = tmpl.role === 'psalm-2' ? 'psalm' : tmpl.role
+            let matched: Section | undefined
+
+            if (tmpl.role === 'psalm' || tmpl.role === 'psalm-2') {
+              // Find nth unassigned psalm
+              psalmCount++
+              let found = 0
+              for (const s of psalterSections) {
+                if (!assigned.has(s.id) && s.liturgicalRole === 'psalm') {
+                  found++
+                  if (found === (tmpl.role === 'psalm' ? 1 : 1)) {
+                    matched = s
+                    break
+                  }
+                }
+              }
+            } else {
+              // Find first unassigned section with matching role
+              matched = psalterSections.find(s => !assigned.has(s.id) && s.liturgicalRole === targetRole)
+            }
+
+            if (matched) {
+              step.sectionId = matched.id
+              step.label = matched.title
+              step.labelMn = matched.titleMn
+              assigned.add(matched.id)
+            } else {
+              // No matching psalter section found — might be in propers or missing
+              step.isGap = tmpl.role === 'invitatory' // invitatory often referenced by page
+              if (tmpl.pageRef) step.pageRef = tmpl.pageRef
+            }
+          }
+
+          steps.push(step)
+        }
+
+        // Add any unassigned psalter sections as 'continuation' steps
+        for (const s of psalterSections) {
+          if (!assigned.has(s.id)) {
+            order++
+            steps.push({
+              order,
+              liturgicalRole: s.liturgicalRole || 'continuation',
+              label: s.title,
+              labelMn: s.titleMn,
+              source: 'psalter',
+              sectionId: s.id,
+              isGap: false,
+            })
+          }
+        }
+
+        flows.push({
+          week: w,
+          day: dayMn,
+          dayKo: DAY_NAMES_KO[dayMn] || dayMn,
+          hour,
+          steps,
+        })
+      }
+    }
+  }
+
+  return flows
 }
 
 // P2-1: Build-time QA validation

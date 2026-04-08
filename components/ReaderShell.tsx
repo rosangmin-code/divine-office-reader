@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useReaderSettings } from "@/hooks/useReaderSettings"
 import { useActiveSection } from "@/hooks/useActiveSection"
 import { useSectionLoader, getGroupForId } from "@/hooks/useSectionLoader"
@@ -9,6 +9,7 @@ import { loadSettings } from "@/lib/reader-store"
 import { DesktopSidebar, MobileSidebar } from "./Sidebar"
 import Toolbar from "./Toolbar"
 import Breadcrumb from "./Breadcrumb"
+import PrayerFlowGuide from "./PrayerFlowGuide"
 
 interface Props {
   bookmarks: BookmarkNode
@@ -20,6 +21,7 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
   const { activeId, scrollTo } = useActiveSection(orderedIds, hydrated)
   const { content, loadGroup } = useSectionLoader({})
   const pendingScrollId = useRef<string | null>(null)
+  const [flowGuideOpen, setFlowGuideOpen] = useState(false)
 
   // Load the first group on mount
   useEffect(() => {
@@ -87,6 +89,8 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
           updateSetting("fontSize", Math.min(32, Math.max(14, settings.fontSize + delta)))
         }
         onToggleDark={() => updateSetting("darkMode", !settings.darkMode)}
+        onToggleFlowGuide={() => setFlowGuideOpen(prev => !prev)}
+        flowGuideOpen={flowGuideOpen}
       />
       <Breadcrumb bookmarks={bookmarks} activeId={activeId} />
       {/* Mobile sidebar: fixed overlay outside flex to avoid covering toolbar */}
@@ -105,6 +109,15 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
           onNavigate={handleNavigate}
           open={settings.sidebarOpen}
         />
+        {/* Prayer Flow Guide panel (right side on desktop, overlay on mobile) */}
+        {flowGuideOpen && (
+          <PrayerFlowGuide
+            open={flowGuideOpen}
+            onClose={() => setFlowGuideOpen(false)}
+            activeId={activeId}
+            onNavigate={handleNavigate}
+          />
+        )}
         <main
           className="flex-1 overflow-y-auto px-4 py-8 md:px-12 lg:px-20"
           style={hydrated ? { fontSize: `${settings.fontSize}px` } : undefined}

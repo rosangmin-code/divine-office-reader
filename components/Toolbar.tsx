@@ -7,9 +7,11 @@ interface Props {
   onToggleSidebar: () => void
   onFontSize: (delta: number) => void
   onToggleDark: () => void
+  onToggleFlowGuide?: () => void
+  flowGuideOpen?: boolean
 }
 
-export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggleDark }: Props) {
+export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggleDark, onToggleFlowGuide, flowGuideOpen }: Props) {
   return (
     <header className="h-12 flex items-center justify-between px-3 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex-shrink-0 relative z-50">
       <div className="flex items-center gap-2">
@@ -46,6 +48,22 @@ export default function Toolbar({ settings, onToggleSidebar, onFontSize, onToggl
           A+
         </button>
         <div className="w-px h-5 bg-stone-200 dark:bg-stone-700 mx-0.5" role="separator" />
+        {onToggleFlowGuide && (
+          <button
+            onClick={onToggleFlowGuide}
+            className={`p-2.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+              flowGuideOpen ? "text-stone-900 dark:text-stone-100 bg-stone-100 dark:bg-stone-800" : "text-stone-600 dark:text-stone-400"
+            }`}
+            aria-label={flowGuideOpen ? "기도 가이드 닫기" : "기도 가이드 열기"}
+            aria-pressed={flowGuideOpen}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={onToggleDark}
           className="p-2.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
