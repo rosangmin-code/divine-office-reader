@@ -2,7 +2,7 @@
 
 > **모듈**: data-pipeline
 > **담당 영역**: 소스 데이터 변환, 빌드 파이프라인, 데이터 품질 테스트
-> **관련 파일**: `scripts/build-data.ts`, `tests/build-data.test.ts`
+> **관련 파일**: `modules/data-pipeline/build-data.ts`, `modules/data-pipeline/__tests__/build-data.test.ts`
 
 ---
 
@@ -27,7 +27,7 @@ Vercel Production
 
 ### 출력 데이터
 - 6개 그룹 분할 JSON (`public/data/content/`)
-- 목차 트리 JSON (`public/data/content.json`)
+- 전체 콘텐츠 통합 JSON (`public/data/content.json`) — 테스트 검증용
 - 478개 노드, 최대 depth 5
 
 ---
@@ -114,9 +114,9 @@ Vercel Production
 
 | 파일 | 역할 |
 |------|------|
-| `scripts/build-data.ts` | 소스 데이터 → JSON 변환 스크립트 |
-| `tests/build-data.test.ts` | 데이터 품질 테스트 (T-CLEAN, T-STRUCT, T-SEG) |
-| `public/data/content.json` | 목차 트리 (bookmarks) |
+| `modules/data-pipeline/build-data.ts` | 소스 데이터 → JSON 변환 스크립트 |
+| `modules/data-pipeline/__tests__/build-data.test.ts` | 데이터 품질 테스트 (T-CLEAN, T-STRUCT, T-SEG) |
+| `public/data/content.json` | 전체 콘텐츠 통합 JSON (테스트 검증용) |
 | `public/data/content/week1.json` | 1주차 시편집 콘텐츠 |
 | `public/data/content/week2.json` | 2주차 시편집 콘텐츠 |
 | `public/data/content/week3.json` | 3주차 시편집 콘텐츠 |

@@ -1,6 +1,5 @@
 # Divine Office Reader — 모듈형 PRD 인덱스
 
-> **원본**: [`docs/PRD.md`](../PRD.md) (deprecated — 참조용으로 보존)
 > **버전**: 0.1.0
 > **최종 갱신**: 2026-04-09
 
@@ -107,7 +106,6 @@
 | UX 시나리오 | [`docs/UX-SCENARIOS.md`](../UX-SCENARIOS.md) | 페르소나별 9개 사용 시나리오 |
 | E2E 테스트 계획 | [`docs/E2E-TEST-PLAN.md`](../E2E-TEST-PLAN.md) | E2E 테스트 ID 체계 및 RTM |
 | 기도 순서 가이드 | [`docs/PRAYER-GUIDE.md`](../PRAYER-GUIDE.md) | 아침/저녁기도 교차 이동 안내 |
-| 원본 PRD (deprecated) | [`docs/PRD.md`](../PRD.md) | 모듈화 이전 통합 PRD |
 
 ---
 
