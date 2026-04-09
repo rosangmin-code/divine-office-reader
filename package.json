@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "build:data": "npx tsx scripts/build-data.ts",
+    "build:data": "npx tsx modules/data-pipeline/build-data.ts",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "vitest run",

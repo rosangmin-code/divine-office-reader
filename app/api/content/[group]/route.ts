@@ -1,7 +1,8 @@
 import fs from "fs/promises"
 import path from "path"
 import { NextResponse } from "next/server"
-import { ALL_CONTENT_GROUPS, ContentGroup } from "@/lib/types"
+import { ALL_CONTENT_GROUPS } from "@/modules/shared"
+import type { ContentGroup } from "@/modules/shared"
 
 export async function GET(
   _request: Request,

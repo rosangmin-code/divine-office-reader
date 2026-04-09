@@ -1,3 +1,11 @@
+> **DEPRECATED**: 이 문서는 모듈화되었습니다. 최신 PRD는 [`docs/prd/README.md`](./prd/README.md)를 참조하세요.
+> 모듈별 PRD: [navigation](./prd/navigation.md) | [settings](./prd/settings.md) | [content](./prd/content.md) | [prayer-flow](./prd/prayer-flow.md) | [data-pipeline](./prd/data-pipeline.md)
+> 추적 매트릭스: [`docs/TRACEABILITY-MATRIX.md`](./TRACEABILITY-MATRIX.md)
+>
+> 아래 내용은 참조용으로 보존됩니다.
+
+---
+
 # Divine Office Reader — Product Requirements Document (PRD)
 
 ## 1. 제품 개요

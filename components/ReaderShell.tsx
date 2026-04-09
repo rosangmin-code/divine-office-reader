@@ -1,15 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useReaderSettings } from "@/hooks/useReaderSettings"
-import { useActiveSection } from "@/hooks/useActiveSection"
-import { useSectionLoader, getGroupForId } from "@/hooks/useSectionLoader"
-import { BookmarkNode } from "@/lib/types"
-import { loadSettings } from "@/lib/reader-store"
-import { DesktopSidebar, MobileSidebar } from "./Sidebar"
-import Toolbar from "./Toolbar"
-import Breadcrumb from "./Breadcrumb"
-import PrayerFlowGuide from "./PrayerFlowGuide"
+import type { BookmarkNode } from "@/modules/shared"
+import { DesktopSidebar, MobileSidebar, Breadcrumb, useActiveSection } from "@/modules/navigation"
+import { Toolbar, useReaderSettings, loadSettings } from "@/modules/settings"
+import { LiturgicalContent, useSectionLoader, getGroupForId } from "@/modules/content"
+import { PrayerFlowGuide } from "@/modules/prayer-flow"
 
 interface Props {
   bookmarks: BookmarkNode
@@ -145,9 +141,13 @@ export default function ReaderShell({ bookmarks, orderedIds }: Props) {
                   <h3 className="text-sm font-medium text-stone-400 dark:text-stone-500 mb-2 uppercase tracking-wide">
                     {section.titleMn}
                   </h3>
-                  <div className="whitespace-pre-wrap leading-relaxed font-serif">
-                    {section.content}
-                  </div>
+                  {section.segments && section.segments.length > 0 ? (
+                    <LiturgicalContent segments={section.segments} />
+                  ) : (
+                    <div className="whitespace-pre-wrap leading-relaxed font-serif">
+                      {section.content}
+                    </div>
+                  )}
                   <hr className="mt-8 border-stone-200 dark:border-stone-800" />
                 </article>
               )

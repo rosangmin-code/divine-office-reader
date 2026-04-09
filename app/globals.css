@@ -5,6 +5,18 @@ html {
   height: 100dvh;
 }
 
+/* Liturgical content colors */
+.liturgical-rubric {
+  color: #b91c1c; /* red-700 */
+}
+.dark .liturgical-rubric {
+  color: #f87171; /* red-400 */
+}
+
+.liturgical-response {
+  color: inherit;
+}
+
 .font-serif {
   font-family: Georgia, "Times New Roman", serif;
 }

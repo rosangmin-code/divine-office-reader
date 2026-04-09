@@ -1,6 +1,6 @@
 import fs from "fs"
 import path from "path"
-import { BookmarkNode } from "@/lib/types"
+import type { BookmarkNode } from "@/modules/shared"
 import ReaderShell from "@/components/ReaderShell"
 
 export default function HomePage() {
